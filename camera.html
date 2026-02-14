@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chụp nè</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="Assets/photobooth/favicon.png" type="image/x-icon" />
+  <link rel="stylesheet" href="StyleSheets/camera.css" />
+</head>
+<body>
+  <div class="logo">
+    <img src="Assets/photobooth/logo-new.png" alt="Logo">
+  </div>
+  <div class="photobooth-container" id="booth">
+    <div class="bubble-container"></div>
+    <div class="countdown-timer">3</div>
+    <canvas id="finalCanvas" width="1176" height="1470"></canvas>
+    <video id="liveVideo" autoplay playsinline muted></video>
+    <img class="frame-overlay" src="Assets/photobooth/camerapage/frame.png" alt="frame overlay" />
+  </div>
+  <div class="frame-selectors" style="display: flex; gap: 10px; margin-bottom: 15px; justify-content: center;">
+  <img src="Assets/photobooth/camerapage/frame.png" class="frame-thumb" data-frame="Assets/photobooth/camerapage/frame.png" style="width: 50px; cursor: pointer; border: 2px solid #1E1E1E;">
+  <img src="Assets/photobooth/camerapage/frame2.png" class="frame-thumb" data-frame="Assets/photobooth/camerapage/frame2.png" style="width: 50px; cursor: pointer; border: 1px solid #ccc;">
+</div>
+
+  <div class="controls">
+    <button id="takePhoto">2, 3 chụp</button>
+    <button id="readyButton" disabled style="display: none;">Tiếp nè</button>
+  </div>
+  
+
+  <script src="Javascripts/camera.js"></script>
+  <script src="Javascripts/bubbles.js"></script>
+</body>
+</html>
