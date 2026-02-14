@@ -138,7 +138,6 @@ button {
 button {
   color: var(--main-text); /* Đổi từ màu mặc định sang màu #555555 */
   font-family: 'Times New Roman', Times, serif;
-  ...
 }
 
 button:hover {

@@ -6,7 +6,8 @@ const elements = {
   canvas: document.getElementById('finalCanvas'),
   ctx: document.getElementById('finalCanvas').getContext('2d'),
   takePhotoBtn: document.getElementById('takePhoto'),
-  countdownEl: document.querySelector('.countdown-timer')
+  countdownEl: document.querySelector('.countdown-timer'),
+  shutterSound: new Audio('Assets/photobooth/shutter.mp3') 
 };
 
 let photoStage = 0; 
@@ -37,6 +38,7 @@ const startCountdown = callback => {
 };
 
 const capturePhoto = () => {
+  elements.shutterSound.play().catch(err => console.log("Audio play failed:", err));
   const { video, ctx, takePhotoBtn } = elements;
   const yOffset = photoStage === 0 ? 0 : HALF;
   const vW = video.videoWidth, vH = video.videoHeight;
