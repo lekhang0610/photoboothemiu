@@ -122,36 +122,147 @@ body {
 }
 
 /* buttons */
+/* Container tổng cho các nhóm nút */
+.controls-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  margin-top: 25px;
+  width: 100%;
+}
+
+.main-actions, .edit-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Style chung cho tất cả các nút */
 button {
-  padding: 10px 16px;
-  font-size: 16px;
+  padding: 10px 20px;
+  font-size: 1rem;
   cursor: pointer;
   color: var(--main-text);
-  font-family: Castoro, serif;
-  font-weight: 400;
+  font-family: 'Times New Roman', Times, serif; /* Đồng bộ font theo style bạn thích */
   background-color: var(--white);
-  border: 1px solid #1e1e1e;
-  border-radius: 0.5rem;
+  border: 1.5px solid #1e1e1e;
+  border-radius: 0.75rem;
   text-align: center;
-  transition: transform 0.2s ease-in-out;
-}
-button {
-  color: var(--main-text); /* Đổi từ màu mặc định sang màu #555555 */
-  font-family: 'Times New Roman', Times, serif;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 2px 2px 0px #1e1e1e; /* Tạo hiệu ứng nổi khối nhẹ */
 }
 
-button:hover {
-  transform: scale(1.05);
+button:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px #1e1e1e;
 }
 
-#takePhoto {
-  display: flex;
+button:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: 0px 0px 0px #1e1e1e;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Nút "Ok chưa??" - Ưu tiên màu hồng pastel cho hợp Hello Kitty */
+#readyButton {
+  background-color: #ffdae9;
+  border-color: #ff85b3;
+  color: #d63384;
+  font-weight: bold;
+}
+
+/* Nút chỉnh sửa (Chọn lại, Crop lại) - Style nhẹ nhàng hơn */
+.edit-actions button {
+  font-size: 0.9rem;
+  padding: 8px 16px;
+  background-color: #f0faff;
+  border-style: dashed; /* Tạo nét đứt cho phân cấp nút phụ */
+  color: #2a4a53;
+}
+
+/* Căn chỉnh lại Frame Selector cho chuyên nghiệp */
+.frame-selectors {
+  display: flex; 
+  gap: 15px; 
+  margin: 20px 0; 
   justify-content: center;
-  align-items: center;
-  gap: 0.56169rem;
-  width: 10rem;
-  height: 3rem;
-  padding: 0.5rem 1rem;
-  background-color: #FFF;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 10px 20px;
+  border-radius: 20px;
+  border: 1px solid #ddd;
 }
 
+.frame-thumb {
+  width: 50px; 
+  height: auto;
+  cursor: pointer; 
+  border-radius: 4px;
+  transition: transform 0.2s;
+}
+
+.frame-thumb:hover {
+  transform: scale(1.15);
+}
+
+#cropperModal {
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px); /* Làm mờ nền phía sau modal */
+}
+
+.cropper-controls button {
+  min-width: 120px;
+  border-radius: 50px; /* Nút bo tròn hoàn toàn cho modal */
+}
+
+#confirmCrop {
+  background-color: #ff85b3;
+  color: white;
+  border: none;
+}
+
+/* Thêm vào camera.css hoặc thẻ <style> */
+.sticker-container {
+  margin-bottom: 10px; /* Tạo khoảng cách với nút bên dưới */
+  text-align: center;
+}
+
+.edit-note {
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 0.9rem;
+  color: #555555;
+  font-style: italic;
+  margin: 0;
+}
+
+.controls-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 15px;
+}
+
+/* Định nghĩa hiệu ứng rung nhẹ */
+@keyframes shake-soft {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  50% { transform: translateX(2px); }
+  75% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}
+
+/* Class để kích hoạt hiệu ứng */
+.shake-animation {
+  animation: shake-soft 0.4s ease-in-out;
+}
+
+.edit-hint-container {
+  transition: opacity 0.3s ease;
+  /* Giữ các style cũ của bạn */
+}

@@ -1,6 +1,15 @@
 let currentFramePath = 'Assets/photobooth/camerapage/frame.png';
-let uploadedImages = [null, null]; // Lưu 2 ảnh riêng biệt
+let uploadedImages = [null, null]; // Lưu trữ: { img: Image, rawFile: File, x: 0, y: 0 }
+
 const WIDTH = 1176, HEIGHT = 1470, HALF = HEIGHT / 2;
+const TARGET_ASPECT = WIDTH / HALF;
+
+let cropper = null;
+let currentFile = null; 
+let isDragging = false;
+let startX, startY;
+let activePhotoIndex = -1; 
+let photoStage = 0; 
 
 const elements = {
   canvas: document.getElementById('finalCanvas'),
@@ -8,102 +17,202 @@ const elements = {
   uploadInput: document.getElementById('uploadPhotoInput'),
   uploadBtn: document.getElementById('uploadPhoto'),
   readyBtn: document.getElementById('readyButton'),
-  frameOverlay: document.querySelector('.frame-overlay') // Để cập nhật preview
+  frameOverlay: document.querySelector('.frame-overlay'),
+  cropperModal: document.getElementById('cropperModal'),
+  imageToCrop: document.getElementById('imageToCrop'),
+  confirmCrop: document.getElementById('confirmCrop'),
+  cancelCrop: document.getElementById('cancelCrop'),
+  reEditControls: document.getElementById('re-edit-controls'),
+  reSelectBtn: document.getElementById('reSelectBtn'),
+  reCropBtn: document.getElementById('reCropBtn')
 };
 
-let photoStage = 0; // 0: ảnh 1, 1: ảnh 2, 2: hoàn tất
-
-// Hàm vẽ chính - Được tối ưu để không bị chồng frame
+// Hàm vẽ chính trên Canvas
 const renderCanvas = () => {
   const { ctx } = elements;
-  
-  // 1. Xóa sạch canvas trước khi vẽ bất cứ thứ gì mới
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  // Hiện dòng lưu ý khi đã có ảnh
+if (uploadedImages[0] || uploadedImages[1]) {
+    document.querySelector('.sticker-container').style.opacity = '1';
+} else {
+    document.querySelector('.sticker-container').style.opacity = '0';
+}
 
-  // 2. Vẽ các ảnh đã upload
-  uploadedImages.forEach((img, index) => {
-    if (img) {
-      const yOffset = index * HALF;
-      const targetAspect = WIDTH / HALF;
-      const imgAspect = img.width / img.height;
-      let sx, sy, sw, sh;
+  uploadedImages.forEach((photoData, index) => {
+    if (photoData) {
+      const yBaseOffset = index * HALF;
+      ctx.save();
+      // Tạo vùng cắt để ảnh không tràn ra ngoài khung tương ứng
+      ctx.beginPath();
+      ctx.rect(0, yBaseOffset, WIDTH, HALF);
+      ctx.clip();
 
-      if (imgAspect > targetAspect) { 
-        sh = img.height; sw = img.height * targetAspect; sx = (img.width - sw) / 2; sy = 0; 
-      } else { 
-        sw = img.width; sh = img.width / targetAspect; sx = 0; sy = (img.height - sh) / 2; 
-      }
-      ctx.drawImage(img, sx, sy, sw, sh, 0, yOffset, WIDTH, HALF);
+      // Vẽ ảnh dựa trên tọa độ x, y người dùng đã điều chỉnh
+      ctx.drawImage(photoData.img, photoData.x, yBaseOffset + photoData.y, WIDTH, HALF);
+      ctx.restore();
     }
   });
   
-  // 3. Vẽ frame - Sử dụng biến cục bộ để tránh lỗi load ảnh cũ
+  // Vẽ khung đè lên trên cùng
   const frame = new Image();
   frame.src = currentFramePath;
   frame.onload = () => {
-    // Chỉ vẽ nếu đường dẫn ảnh vẫn là frame hiện tại (tránh lỗi bất đồng bộ)
     if (frame.src.includes(currentFramePath)) {
       ctx.drawImage(frame, 0, 0, WIDTH, HEIGHT);
     }
   };
 };
 
+// Mở trình cắt ảnh (Cropper)
+const openCropper = (file) => {
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    elements.imageToCrop.src = e.target.result;
+    elements.cropperModal.style.display = 'flex';
+    if (cropper) cropper.destroy();
+    cropper = new Cropper(elements.imageToCrop, {
+      aspectRatio: TARGET_ASPECT,
+      viewMode: 1,
+      guides: true,
+    });
+  };
+  reader.readAsDataURL(file);
+};
+
 const setupEventListeners = () => {
-  // Click nút chọn ảnh
+  // Nút chọn ảnh ban đầu
   elements.uploadBtn.addEventListener('click', () => {
-    if (photoStage < 2) elements.uploadInput.click();
+    const nextEmptyIndex = uploadedImages.findIndex(img => img === null);
+    photoStage = nextEmptyIndex !== -1 ? nextEmptyIndex : 0;
+    elements.uploadInput.click();
   });
 
-  // Xử lý khi chọn file
   elements.uploadInput.addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (!file) return;
+    if (e.target.files[0]) openCropper(e.target.files[0]);
+    e.target.value = ''; 
+  });
 
+  // Xác nhận cắt ảnh từ Cropper
+  elements.confirmCrop.addEventListener('click', () => {
+    const croppedCanvas = cropper.getCroppedCanvas({ width: WIDTH, height: HALF });
     const img = new Image();
     img.onload = () => {
-      uploadedImages[photoStage] = img; // Lưu vào vị trí 1 hoặc 2
-      photoStage++;
+      uploadedImages[photoStage] = { img, rawFile: currentFile, x: 0, y: 0 };
+      
+      const hasPhoto1 = uploadedImages[0] !== null;
+      const hasPhoto2 = uploadedImages[1] !== null;
 
-      if (photoStage === 1) {
-        elements.uploadBtn.innerText = "Chọn tiếp ảnh 2 nè";
-      } else if (photoStage === 2) {
+      if (hasPhoto1 && hasPhoto2) {
         elements.uploadBtn.style.display = 'none';
         elements.readyBtn.style.display = 'inline-block';
         elements.readyBtn.disabled = false;
+        photoStage = 2;
+      } else {
+        photoStage = hasPhoto1 ? 1 : 0;
+        elements.uploadBtn.innerText = hasPhoto1 ? "Chọn tiếp ảnh 2 nè" : "Chọn ảnh 1 nè";
       }
+
+      elements.cropperModal.style.display = 'none';
+      elements.reEditControls.style.display = 'none';
       renderCanvas();
     };
-    img.src = URL.createObjectURL(file);
-    elements.uploadInput.value = ''; 
+    img.src = croppedCanvas.toDataURL('image/png');
   });
 
-  // Nút Hoàn tất
+  // Chức năng chọn lại ảnh
+  elements.reSelectBtn.addEventListener('click', () => {
+    photoStage = activePhotoIndex;
+    elements.uploadInput.click();
+  });
+
+  // Chức năng Crop lại từ file gốc ban đầu
+  elements.reCropBtn.addEventListener('click', () => {
+    if (uploadedImages[activePhotoIndex]) {
+      photoStage = activePhotoIndex;
+      openCropper(uploadedImages[activePhotoIndex].rawFile);
+    }
+  });
+
+  elements.cancelCrop.addEventListener('click', () => {
+    elements.cropperModal.style.display = 'none';
+    if (cropper) cropper.destroy();
+  });
+
   elements.readyBtn.addEventListener('click', () => {
     localStorage.setItem('photoStrip', elements.canvas.toDataURL('image/png'));
     window.location.href = 'final.html';
   });
 
-  // Đổi frame và sửa lỗi hiển thị
+  // Xử lý sự kiện kéo thả và chọn ảnh để sửa trên Canvas
+  elements.canvas.addEventListener('mousedown', handlePointerDown);
+  window.addEventListener('mousemove', handlePointerMove);
+  window.addEventListener('mouseup', handlePointerUp);
+  elements.canvas.addEventListener('touchstart', handlePointerDown);
+  window.addEventListener('touchmove', handlePointerMove);
+  window.addEventListener('touchend', handlePointerUp);
+
+  // Đổi khung (frame)
   const frameThumbs = document.querySelectorAll('.frame-thumb');
   frameThumbs.forEach(thumb => {
     thumb.addEventListener('click', () => {
       currentFramePath = thumb.getAttribute('data-frame');
-      
-      // Cập nhật cả overlay HTML để em nhìn thấy ngay lập tức
-      if (elements.frameOverlay) {
-        elements.frameOverlay.src = currentFramePath;
-      }
-      
-      renderCanvas(); // Vẽ lại canvas
-      
+      if (elements.frameOverlay) elements.frameOverlay.src = currentFramePath;
+      renderCanvas();
       frameThumbs.forEach(t => t.style.border = '1px solid #ccc');
       thumb.style.border = '2px solid #1E1E1E';
     });
   });
 };
 
+const handlePointerDown = (e) => {
+  const rect = elements.canvas.getBoundingClientRect();
+  const scaleX = WIDTH / rect.width;
+  const scaleY = HEIGHT / rect.height;
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const mouseX = (clientX - rect.left) * scaleX;
+  const mouseY = (clientY - rect.top) * scaleY;
+
+  activePhotoIndex = mouseY < HALF ? 0 : 1;
+
+  if (uploadedImages[activePhotoIndex]) {
+    isDragging = true;
+    startX = mouseX - uploadedImages[activePhotoIndex].x;
+    startY = (mouseY - (activePhotoIndex * HALF)) - uploadedImages[activePhotoIndex].y;
+    
+    // 1. Hiển thị cụm nút chỉnh sửa
+    elements.reEditControls.style.display = 'flex';
+
+    // 2. Kích hoạt hiệu ứng rung cho dòng chữ lưu ý
+    const editHint = document.getElementById('edit-hint');
+    if (editHint) {
+      // Xóa class cũ nếu có để có thể kích hoạt lại hiệu ứng nhiều lần
+      editHint.classList.remove('shake-animation');
+      // Kích hoạt lại hiệu ứng bằng cách thêm class sau một khoảng thời gian cực ngắn (void offset)
+      void editHint.offsetWidth; 
+      editHint.classList.add('shake-animation');
+    }
+  }
+};
+
+const handlePointerMove = (e) => {
+  if (!isDragging || activePhotoIndex === -1) return;
+  const rect = elements.canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const mouseX = (clientX - rect.left) * (WIDTH / rect.width);
+  const mouseY = (clientY - rect.top) * (HEIGHT / rect.height);
+
+  uploadedImages[activePhotoIndex].x = mouseX - startX;
+  uploadedImages[activePhotoIndex].y = (mouseY - (activePhotoIndex * HALF)) - startY;
+  renderCanvas();
+};
+
+const handlePointerUp = () => { isDragging = false; };
+
 document.addEventListener('DOMContentLoaded', () => {
   localStorage.removeItem('photoStrip');
   setupEventListeners();
-  renderCanvas(); // Vẽ khung trống ban đầu
+  renderCanvas();
 });
