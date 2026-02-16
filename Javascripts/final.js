@@ -1,126 +1,131 @@
-// constants
-const WIDTH = 1176, HEIGHT = 1470;
+const { WIDTH, HEIGHT } = BOOTH_CONFIG;
+const canvas = document.getElementById('finalCanvas');
+const ctx = canvas.getContext('2d');
+const stickerButtons = {
+  fish: 'Assets/photobooth/camerapage/stickers/fish.png',
+  octopus: 'Assets/photobooth/camerapage/stickers/octopus.png',
+  axolotl: 'Assets/photobooth/camerapage/stickers/axolotl.png'
+};
 
-// dom elements
-const canvas = document.getElementById('finalCanvas'),
-      ctx = canvas.getContext('2d'),
-      addFishBtn = document.getElementById('addFish'),
-      addOctopusBtn = document.getElementById('addOctopus'),
-      addSeaweedBtn = document.getElementById('addSeaweed'),
-      addAxBtn = document.getElementById('addAx'),
-      addBubbleBtn = document.getElementById('addBubble'),
-      downloadBtn = document.getElementById('downloadBtn'),
-      homeBtn = document.getElementById('homeBtn'),
-      resetBtn = document.getElementById('reset');
+// Arrays for rotating stickers
+const seaweedImages = ['Assets/photobooth/camerapage/stickers/seaweed1.png','Assets/photobooth/camerapage/stickers/seaweed2.png'];
+const bubbleImages = ['Assets/photobooth/camerapage/stickers/bubble1.png','Assets/photobooth/camerapage/stickers/bubble2.png'];
+let seaweedIndex = 0, bubbleIndex = 0;
 
-// sticker state
-let stickers = [], dragOffset = { x: 0, y: 0 }, selectedSticker = null;
+// State
+let stickers = [];
+let selectedSticker = null;
+let dragOffset = { x: 0, y: 0 };
+let finalImage = new Image();
 
-// load photo
-const finalImage = new Image(), dataURL = localStorage.getItem('photoStrip');
+// Load base photo
+const dataURL = localStorage.getItem('photoStrip');
 if (dataURL) {
   finalImage.src = dataURL;
-  finalImage.onload = drawCanvas;
-  localStorage.removeItem('photoStrip');
-} else alert("No photo found!");
+  finalImage.onload = renderCanvas;
+  localStorage.removeItem('photoStrip'); // Clear storage to prevent duplicates on refresh
+} else {
+  alert("No photo found! Redirecting...");
+  goTo('index.html');
+}
 
-// draw canvas
-function drawCanvas() {
+// Render loop
+function renderCanvas() {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
   ctx.drawImage(finalImage, 0, 0, WIDTH, HEIGHT);
   stickers.forEach(s => ctx.drawImage(s.img, s.x, s.y, s.width, s.height));
 }
 
-// add sticker
-function addSticker(src) {
+// Add sticker helper
+const addSticker = (src) => {
   const img = new Image();
   img.src = src;
   img.onload = () => {
     stickers.push({
       img,
-      x: WIDTH / 2 - img.width / 6,
-      y: HEIGHT / 2 - img.height / 6,
+      x: WIDTH / 2 - img.width / 5, // Center roughly
+      y: HEIGHT / 2 - img.height / 5,
       width: img.width / 2.5,
-      height: img.height / 2.5,
-      dragging: false
+      height: img.height / 2.5
     });
-    drawCanvas();
+    renderCanvas();
   };
-}
+};
 
-// pointer position
-function getPointerPos(e) {
-  const rect = canvas.getBoundingClientRect(), scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
-  const clientX = e.touches?.[0]?.clientX ?? e.clientX,
-        clientY = e.touches?.[0]?.clientY ?? e.clientY;
-  return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
-}
+// Unified Pointer Events (Mouse + Touch)
+const getPointerPos = (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return {
+    x: (clientX - rect.left) * (WIDTH / rect.width),
+    y: (clientY - rect.top) * (HEIGHT / rect.height)
+  };
+};
 
-// drag and drop
-function pointerDown(e) {
-  const { x: mouseX, y: mouseY } = getPointerPos(e);
+const handlePointerDown = (e) => {
+  e.preventDefault(); // Prevent scrolling on touch
+  const { x, y } = getPointerPos(e);
+  
+  // Iterate backwards to select top-most sticker
   for (let i = stickers.length - 1; i >= 0; i--) {
     const s = stickers[i];
-    if (mouseX >= s.x && mouseX <= s.x + s.width && mouseY >= s.y && mouseY <= s.y + s.height) {
+    if (x >= s.x && x <= s.x + s.width && y >= s.y && y <= s.y + s.height) {
       selectedSticker = s;
-      s.dragging = true;
-      dragOffset.x = mouseX - s.x;
-      dragOffset.y = mouseY - s.y;
-      stickers.splice(i, 1);
-      stickers.push(s);
-      drawCanvas();
-      e.preventDefault();
+      dragOffset = { x: x - s.x, y: y - s.y };
+      // Move selected sticker to top of stack
+      stickers.push(stickers.splice(i, 1)[0]);
+      renderCanvas();
       break;
     }
   }
-}
-function pointerMove(e) {
-  if (!selectedSticker?.dragging) return;
-  const { x: mouseX, y: mouseY } = getPointerPos(e);
-  selectedSticker.x = mouseX - dragOffset.x;
-  selectedSticker.y = mouseY - dragOffset.y;
-  drawCanvas();
+};
+
+const handlePointerMove = (e) => {
+  if (!selectedSticker) return;
   e.preventDefault();
-}
-function pointerUp() { if (selectedSticker) selectedSticker.dragging = false; selectedSticker = null; }
+  const { x, y } = getPointerPos(e);
+  selectedSticker.x = x - dragOffset.x;
+  selectedSticker.y = y - dragOffset.y;
+  renderCanvas();
+};
 
-// mouse events
-canvas.addEventListener('mousedown', pointerDown);
-canvas.addEventListener('mousemove', pointerMove);
-canvas.addEventListener('mouseup', pointerUp);
-canvas.addEventListener('mouseleave', pointerUp);
+const handlePointerUp = () => { selectedSticker = null; };
 
-// touch events
-canvas.addEventListener('touchstart', pointerDown);
-canvas.addEventListener('touchmove', pointerMove);
-canvas.addEventListener('touchend', pointerUp);
-canvas.addEventListener('touchcancel', pointerUp);
-
-// stickers
-addFishBtn.addEventListener('click', () => addSticker('Assets/photobooth/camerapage/stickers/fish.png'));
-addOctopusBtn.addEventListener('click', () => addSticker('Assets/photobooth/camerapage/stickers/octopus.png'));
-
-const seaweedImages = ['Assets/photobooth/camerapage/stickers/seaweed1.png','Assets/photobooth/camerapage/stickers/seaweed2.png'], 
-      bubbleImages = ['Assets/photobooth/camerapage/stickers/bubble1.png','Assets/photobooth/camerapage/stickers/bubble2.png'];
-let seaweedIndex = 0, bubbleIndex = 0;
-
-addSeaweedBtn.addEventListener('click', () => { addSticker(seaweedImages[seaweedIndex]); seaweedIndex = (seaweedIndex + 1) % seaweedImages.length; });
-addAxBtn.addEventListener('click', () => addSticker('Assets/photobooth/camerapage/stickers/axolotl.png'));
-addBubbleBtn.addEventListener('click', () => { addSticker(bubbleImages[bubbleIndex]); bubbleIndex = (bubbleIndex + 1) % bubbleImages.length; });
-
-// reset
-resetBtn.addEventListener('click', () => { stickers = []; drawCanvas(); });
-
-// download
-downloadBtn.addEventListener('click', () => {
-  canvas.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'photobooth.png'; a.click(); }, 'image/png');
-});
-
-// home
-homeBtn.addEventListener('click', () => window.location.href = 'index.html');
-
-// logo
+// Setup Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
-  const logo = document.querySelector('.logo');
-  if (logo) logo.addEventListener('click', () => window.location.href = 'index.html');
+  initLogo();
+
+  // Canvas events
+  ['mousedown', 'touchstart'].forEach(evt => canvas.addEventListener(evt, handlePointerDown, { passive: false }));
+  ['mousemove', 'touchmove'].forEach(evt => canvas.addEventListener(evt, handlePointerMove, { passive: false }));
+  ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach(evt => canvas.addEventListener(evt, handlePointerUp));
+
+  // Button bindings
+  document.getElementById('addFish').onclick = () => addSticker(stickerButtons.fish);
+  document.getElementById('addOctopus').onclick = () => addSticker(stickerButtons.octopus);
+  document.getElementById('addAx').onclick = () => addSticker(stickerButtons.axolotl);
+  
+  document.getElementById('addSeaweed').onclick = () => {
+    addSticker(seaweedImages[seaweedIndex]);
+    seaweedIndex = (seaweedIndex + 1) % seaweedImages.length;
+  };
+
+  document.getElementById('addBubble').onclick = () => {
+    addSticker(bubbleImages[bubbleIndex]);
+    bubbleIndex = (bubbleIndex + 1) % bubbleImages.length;
+  };
+
+  document.getElementById('reset').onclick = () => { stickers = []; renderCanvas(); };
+  
+  document.getElementById('downloadBtn').onclick = () => {
+    canvas.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'photobooth-love.png';
+      a.click();
+    });
+  };
+
+  document.getElementById('homeBtn').onclick = () => goTo('index.html');
 });
