@@ -9,6 +9,8 @@ const elements = {
   takePhotoBtn: document.getElementById('takePhoto'),
   countdownEl: document.querySelector('.countdown-timer'),
   shutterSound: new Audio('Assets/photobooth/shutter.mp3'),
+  // Add counting sound for the 1, 2, 3 countdown
+  countSound: new Audio('Assets/photobooth/count.mp3'), 
   frameThumbs: document.querySelectorAll('.frame-thumb'),
   frameOverlay: document.querySelector('.frame-overlay')
 };
@@ -26,7 +28,8 @@ const updateVideoPosition = (stage) => {
 
 // Capture photo logic
 const capturePhoto = () => {
-  elements.shutterSound.play().catch(e => console.warn('Sound play failed', e));
+  // Play shutter sound only when the photo is actually captured
+  elements.shutterSound.play().catch(e => console.warn('Shutter sound failed', e));
   
   const { video, ctx } = elements;
   const yOffset = photoStage === 0 ? 0 : HALF;
@@ -76,16 +79,22 @@ const finalizeSession = () => {
   };
 };
 
-// Countdown timer logic
+// Countdown timer logic with sound
 const startCountdown = () => {
   let count = 3;
   elements.countdownEl.textContent = count;
   elements.countdownEl.style.display = 'flex';
   
+  // Play count sound for the first number (3)
+  elements.countSound.play().catch(e => console.warn('Count sound failed', e));
+
   const timer = setInterval(() => {
     count--;
     if (count > 0) {
       elements.countdownEl.textContent = count;
+      // Play count sound for 2 and 1
+      elements.countSound.currentTime = 0;
+      elements.countSound.play().catch(e => console.warn('Count sound failed', e));
     } else {
       clearInterval(timer);
       elements.countdownEl.style.display = 'none';
@@ -115,14 +124,17 @@ document.addEventListener('DOMContentLoaded', () => {
   initCamera();
 
   elements.takePhotoBtn.addEventListener('click', () => {
-    elements.shutterSound.play().then(() => {
-        elements.shutterSound.pause();
-        elements.shutterSound.currentTime = 0;
-    }).catch(() => {});
+    // Unlock both sounds for iOS by playing and pausing them immediately
+    [elements.shutterSound, elements.countSound].forEach(sound => {
+        sound.play().then(() => {
+            sound.pause();
+            sound.currentTime = 0;
+        }).catch(() => {});
+    });
 
     elements.takePhotoBtn.disabled = true;
     startCountdown();
-});
+  });
 
   // Frame selection logic
   elements.frameThumbs.forEach(thumb => {
