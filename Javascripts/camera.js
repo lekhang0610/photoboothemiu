@@ -115,9 +115,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initCamera();
 
   elements.takePhotoBtn.addEventListener('click', () => {
+    elements.shutterSound.play().then(() => {
+        elements.shutterSound.pause();
+        elements.shutterSound.currentTime = 0;
+    }).catch(() => {});
+
     elements.takePhotoBtn.disabled = true;
     startCountdown();
-  });
+});
 
   // Frame selection logic
   elements.frameThumbs.forEach(thumb => {
