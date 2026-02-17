@@ -9,6 +9,10 @@ let photoStage = 0;
 let isDragging = false;
 let startDrag = { x: 0, y: 0 };
 
+// Pre-load frame image to prevent flickering during drag
+const frameImg = new Image();
+frameImg.src = currentFramePath;
+
 const elements = {
   canvas: document.getElementById('finalCanvas'),
   ctx: document.getElementById('finalCanvas').getContext('2d'),
@@ -26,32 +30,47 @@ const elements = {
   frameThumbs: document.querySelectorAll('.frame-thumb')
 };
 
-// Render the main canvas with images and frame
+// Render the main canvas with images, frame, and selection highlight
 const renderCanvas = () => {
   const { ctx } = elements;
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
-
-  // Toggle hint visibility
-  const hintContainer = document.querySelector('.sticker-container');
-  if (hintContainer) hintContainer.style.opacity = (uploadedImages[0] || uploadedImages[1]) ? '1' : '0';
 
   // Draw user photos
   uploadedImages.forEach((photo, index) => {
     if (photo) {
       const yBaseOffset = index * HALF;
       ctx.save();
+      
+      // Create clipping region for the photo slot
       ctx.beginPath();
       ctx.rect(0, yBaseOffset, WIDTH, HALF);
       ctx.clip();
+      
+      // Draw the photo
       ctx.drawImage(photo.img, photo.x, yBaseOffset + photo.y, WIDTH, HALF);
+      
+      // --- Selection Highlight (Feature Update) ---
+      if (index === activePhotoIndex) {
+        ctx.restore(); // Exit clip to draw border on top
+        ctx.save();
+        ctx.strokeStyle = '#ff85b3'; // Pink theme color
+        ctx.lineWidth = 15;
+        ctx.strokeRect(10, yBaseOffset + 10, WIDTH - 20, HALF - 20);
+        
+        ctx.fillStyle = 'rgba(255, 133, 179, 0.2)'; // Light pink overlay
+        ctx.fillRect(10, yBaseOffset + 10, WIDTH - 20, HALF - 20);
+      }
+      
       ctx.restore();
     }
   });
   
-  // Draw frame overlay
-  const frame = new Image();
-  frame.src = currentFramePath;
-  frame.onload = () => ctx.drawImage(frame, 0, 0, WIDTH, HEIGHT);
+  // Draw the pre-loaded frame overlay
+  if (frameImg.complete) {
+    ctx.drawImage(frameImg, 0, 0, WIDTH, HEIGHT);
+  } else {
+    frameImg.onload = () => ctx.drawImage(frameImg, 0, 0, WIDTH, HEIGHT);
+  }
 };
 
 // Initialize CropperJS
@@ -71,40 +90,40 @@ const openCropper = (file) => {
   reader.readAsDataURL(file);
 };
 
-// Drag Logic (Unified)
+// --- DRAG & SELECT LOGIC ---
 const handlePointerDown = (e) => {
   const rect = elements.canvas.getBoundingClientRect();
+  const scaleX = WIDTH / rect.width;
   const scaleY = HEIGHT / rect.height;
-  const clientY = e.touches ? e.touches[0].clientY : e.clientX;
+
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+  const mouseX = (clientX - rect.left) * scaleX;
   const mouseY = (clientY - rect.top) * scaleY;
 
+  // Determine which photo slot was clicked (0: top, 1: bottom)
   activePhotoIndex = mouseY < HALF ? 0 : 1;
+  
+  // Immediately update to show selection highlight
+  renderCanvas();
 
   if (uploadedImages[activePhotoIndex]) {
     isDragging = true;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const scaleX = WIDTH / rect.width;
-    const mouseX = (clientX - rect.left) * scaleX;
-
     startDrag = {
       x: mouseX - uploadedImages[activePhotoIndex].x,
       y: (mouseY - (activePhotoIndex * HALF)) - uploadedImages[activePhotoIndex].y
     };
     
-    // UI Feedback
     elements.reEditControls.style.display = 'flex';
-    const editHint = document.getElementById('edit-hint');
-    if (editHint) {
-      editHint.classList.remove('shake-animation');
-      void editHint.offsetWidth; // Trigger reflow
-      editHint.classList.add('shake-animation');
-    }
+  } else {
+    elements.reEditControls.style.display = 'none';
   }
 };
 
 const handlePointerMove = (e) => {
   if (!isDragging || activePhotoIndex === -1) return;
-  e.preventDefault(); // Stop scrolling on touch
+  if (e.cancelable) e.preventDefault(); 
   
   const rect = elements.canvas.getBoundingClientRect();
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -115,17 +134,20 @@ const handlePointerMove = (e) => {
 
   uploadedImages[activePhotoIndex].x = mouseX - startDrag.x;
   uploadedImages[activePhotoIndex].y = (mouseY - (activePhotoIndex * HALF)) - startDrag.y;
+  
   renderCanvas();
 };
 
-const handlePointerUp = () => { isDragging = false; };
+const handlePointerUp = () => { 
+  isDragging = false; 
+};
 
+// --- EVENT LISTENERS ---
 document.addEventListener('DOMContentLoaded', () => {
   initLogo();
   localStorage.removeItem('photoStrip');
   renderCanvas();
 
-  // Upload & Crop Handlers
   elements.uploadBtn.onclick = () => {
     const nextIndex = uploadedImages.findIndex(img => img === null);
     photoStage = nextIndex !== -1 ? nextIndex : 0;
@@ -143,19 +165,14 @@ document.addEventListener('DOMContentLoaded', () => {
     img.onload = () => {
       uploadedImages[photoStage] = { img, rawFile: currentFile, x: 0, y: 0 };
       
-      const isFull = uploadedImages[0] && uploadedImages[1];
-      if (isFull) {
+      if (uploadedImages[0] && uploadedImages[1]) {
         elements.uploadBtn.style.display = 'none';
         elements.readyBtn.style.display = 'inline-block';
         elements.readyBtn.disabled = false;
-        photoStage = 2;
-      } else {
-        photoStage = uploadedImages[0] ? 1 : 0;
-        elements.uploadBtn.innerText = uploadedImages[0] ? "Chọn tiếp ảnh 2 nè" : "Chọn ảnh 1 nè";
       }
-
       elements.cropperModal.style.display = 'none';
       elements.reEditControls.style.display = 'none';
+      activePhotoIndex = -1; // Reset selection after cropping
       renderCanvas();
     };
     img.src = croppedCanvas.toDataURL('image/png');
@@ -166,7 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cropper) cropper.destroy();
   };
 
-  // Re-edit handlers
   elements.reSelectBtn.onclick = () => {
     photoStage = activePhotoIndex;
     elements.uploadInput.click();
@@ -180,14 +196,18 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   elements.readyBtn.onclick = () => {
-    localStorage.setItem('photoStrip', elements.canvas.toDataURL('image/png'));
-    goTo('final.html');
+    activePhotoIndex = -1; // Ensure no highlight is saved
+    renderCanvas(); 
+    setTimeout(() => {
+        localStorage.setItem('photoStrip', elements.canvas.toDataURL('image/png'));
+        goTo('final.html');
+    }, 50);
   };
 
-  // Frame Selection
   elements.frameThumbs.forEach(thumb => {
     thumb.addEventListener('click', () => {
       currentFramePath = thumb.getAttribute('data-frame');
+      frameImg.src = currentFramePath; // Update global frame object
       if (elements.frameOverlay) elements.frameOverlay.src = currentFramePath;
       renderCanvas();
       elements.frameThumbs.forEach(t => t.style.border = '1px solid #ccc');
@@ -195,7 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Attach pointer events
   elements.canvas.addEventListener('mousedown', handlePointerDown);
   window.addEventListener('mousemove', handlePointerMove);
   window.addEventListener('mouseup', handlePointerUp);
