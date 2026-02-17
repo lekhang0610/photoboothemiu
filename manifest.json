@@ -1,0 +1,21 @@
+{
+  "name": "Photobooth của Bngoc",
+  "short_name": "Photobooth",
+  "description": "Quà Valentine cho Bngoc",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f5f4e7",
+  "theme_color": "#ff85b3",
+  "icons": [
+    {
+      "src": "Assets/photobooth/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "Assets/photobooth/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
